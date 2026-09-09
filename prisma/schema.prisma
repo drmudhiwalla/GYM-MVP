@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Screening {
+  id              String    @id @default(uuid())
+  screeningId     String    @unique @map("screening_id")
+  whatsappNumber  String    @map("whatsapp_number")
+  name            String
+  age             Int
+  gender          String
+  workingStatus   String    @map("working_status")
+
+  // Consent
+  consent1        Boolean   @map("consent_1")
+  consent2        Boolean   @map("consent_2")
+  consent3        Boolean   @map("consent_3")
+
+  // Blood Pressure
+  bpSystolic      Int?      @map("bp_systolic")
+  bpDiastolic     Int?      @map("bp_diastolic")
+  bpCategory      String?   @map("bp_category")
+
+  // BMI
+  heightCm        Float?    @map("height_cm")
+  weightKg        Float?    @map("weight_kg")
+  bmiValue        Float?    @map("bmi_value")
+  bmiCategory     String?   @map("bmi_category")
+
+  // Sleep (B-PSQI)
+  sleepScore      Int?      @map("sleep_score")
+  sleepCategory   String?   @map("sleep_category")
+
+  // Stress (PSS-4)
+  stressScore     Int?      @map("stress_score")
+  stressCategory  String?   @map("stress_category")
+
+  // Family & Medical History
+  familyHistory   Boolean?  @map("family_history")
+  medicalHistory  Boolean?  @map("medical_history")
+
+  // Final Classification
+  finalCategory   String?   @map("final_category")
+  status          String    @default("PARTIAL") @map("status")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("screenings")
+}
