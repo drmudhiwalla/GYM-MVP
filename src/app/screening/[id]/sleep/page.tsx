@@ -1,10 +1,10 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
 import ValidationModal from '@/components/ValidationModal';
-import { loadScreeningById, saveScreeningData } from '@/lib/screening-store';
+import { ScreeningState } from '@/lib/context';
 import { calculateSleepScore, SleepAnswers } from '@/lib/sleep';
 import { classifySleep, categoryColors } from '@/lib/classification';
 import { Category } from '@/lib/types';
@@ -12,7 +12,8 @@ import { Category } from '@/lib/types';
 export default function ScreeningSleep({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const screening = loadScreeningById(id);
+  const [screening, setScreening] = useState<ScreeningState | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [bedHH, setBedHH] = useState('');
   const [bedMM, setBedMM] = useState('');
@@ -32,6 +33,39 @@ export default function ScreeningSleep({ params }: { params: Promise<{ id: strin
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/screening/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          const d = data.data;
+          setScreening({
+            screeningId: d.screeningId, createdAt: d.createdAt, status: d.status,
+            whatsappNumber: d.whatsappNumber, name: d.name, age: d.age, gender: d.gender,
+            workingStatus: d.workingStatus || '', consent1: d.consent1, consent2: d.consent2, consent3: d.consent3,
+            bpSystolic: d.bpSystolic || 0, bpDiastolic: d.bpDiastolic || 0, bpCategory: d.bpCategory,
+            heightCm: d.heightCm || 0, weightKg: d.weightKg || 0, bmiValue: d.bmiValue || 0, bmiCategory: d.bmiCategory,
+            sleepScore: d.sleepScore || 0, sleepCategory: d.sleepCategory,
+            stressScore: d.stressScore || 0, stressCategory: d.stressCategory,
+            familyHistory: d.familyHistory, medicalHistory: d.medicalHistory, finalCategory: d.finalCategory,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="form-wrapper">
+        <div className="form-container" style={{ textAlign: 'center', padding: 60 }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+          <p style={{ color: '#64748b' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!screening) {
     return (
@@ -84,8 +118,11 @@ export default function ScreeningSleep({ params }: { params: Promise<{ id: strin
 
   const handleContinue = () => {
     if (result && resultCategory) {
-      const updated = { ...screening, sleepScore: result.globalScore, sleepCategory: resultCategory };
-      saveScreeningData(updated);
+      fetch(`/api/screening/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sleepScore: result.globalScore, sleepCategory: resultCategory }),
+      }).catch(() => {});
     }
     router.push(`/screening/${id}/sleep/completed`);
   };

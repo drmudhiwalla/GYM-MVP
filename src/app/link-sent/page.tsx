@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
 import { useScreening } from '@/lib/context';
@@ -11,8 +11,37 @@ export default function LinkSentPage() {
   const { state } = useScreening();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const screeningLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/screening/${state.screeningId}`;
+
+  // Save Part 1 data to database when page loads
+  useEffect(() => {
+    if (saved || !state.screeningId) return;
+    fetch('/api/screening', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        screeningId: state.screeningId,
+        whatsappNumber: state.whatsappNumber,
+        name: state.name,
+        age: state.age,
+        gender: state.gender,
+        workingStatus: state.workingStatus,
+        consent1: state.consent1,
+        consent2: state.consent2,
+        consent3: state.consent3,
+        bpSystolic: state.bpSystolic,
+        bpDiastolic: state.bpDiastolic,
+        bpCategory: state.bpCategory,
+        heightCm: state.heightCm,
+        weightKg: state.weightKg,
+        bmiValue: state.bmiValue,
+        bmiCategory: state.bmiCategory,
+        status: 'LINK_SENT',
+      }),
+    }).then(() => setSaved(true)).catch(() => {});
+  }, [state, saved]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(screeningLink);
