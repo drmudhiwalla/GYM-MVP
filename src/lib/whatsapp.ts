@@ -1,11 +1,5 @@
 const MSG91_AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const MSG91_WHATSAPP_NUMBER = process.env.MSG91_WHATSAPP_NUMBER;
-const MSG91_API_URL = 'https://api.msg91.com/api/v5/whatsapp/outbound';
-
-interface SendWhatsAppParams {
-  to: string;
-  message: string;
-}
 
 interface SendTemplateParams {
   to: string;
@@ -15,46 +9,14 @@ interface SendTemplateParams {
 }
 
 /**
- * Send a plain text WhatsApp message via MSG91
- */
-export async function sendWhatsAppMessage({ to, message }: SendWhatsAppParams) {
-  if (!MSG91_AUTH_KEY) throw new Error('WhatsApp service not configured');
-
-  const phone = to.replace(/[^0-9]/g, '');
-
-  const response = await fetch(MSG91_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      authkey: MSG91_AUTH_KEY,
-    },
-    body: JSON.stringify({
-      phone: phone,
-      message: message,
-    }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.message || 'Failed to send WhatsApp message');
-  return data;
-}
-
-/**
  * Send a WhatsApp template message via MSG91
- * Variables array: [name, screeningId, ...other vars]
  */
 export async function sendWhatsAppTemplate({ to, templateName, variables, language = 'en' }: SendTemplateParams) {
   if (!MSG91_AUTH_KEY) throw new Error('WhatsApp service not configured');
 
   const phone = to.replace(/[^0-9]/g, '');
 
-  // Build variables object: { "1": "value1", "2": "value2", ... }
-  const variablesObj: Record<string, string> = {};
-  variables.forEach((val, idx) => {
-    variablesObj[String(idx + 1)] = val;
-  });
-
-  const response = await fetch(MSG91_API_URL, {
+  const response = await fetch('https://api.msg91.com/api/v5/whatsapp/outbound/template/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -73,7 +35,7 @@ export async function sendWhatsAppTemplate({ to, templateName, variables, langua
           components: [
             {
               type: 'body',
-              parameters: Object.entries(variablesObj).map(([key, val]) => ({
+              parameters: variables.map((val) => ({
                 type: 'text',
                 text: val,
               })),
@@ -85,9 +47,10 @@ export async function sendWhatsAppTemplate({ to, templateName, variables, langua
   });
 
   const data = await response.json();
-  if (!response.ok) {
+  console.log('MSG91 response:', JSON.stringify(data));
+  if (!response.ok || data.type === 'error') {
     console.error('MSG91 template error:', data);
-    throw new Error(data?.message || 'Failed to send WhatsApp template');
+    throw new Error(data?.message || data?.error?.message || 'Failed to send WhatsApp template');
   }
   return data;
 }

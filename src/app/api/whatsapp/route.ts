@@ -10,20 +10,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 });
     }
 
-    if (process.env.MSG91_AUTH_KEY && templateName) {
+    const hasMsg91 = !!process.env.MSG91_AUTH_KEY;
+    console.log(`WhatsApp request: to=${to}, template=${templateName}, hasMsg91=${hasMsg91}`);
+
+    if (hasMsg91 && templateName) {
       try {
         const result = await sendWhatsAppTemplate({
           to,
           templateName,
           variables: variables || [],
         });
+        console.log('MSG91 success:', JSON.stringify(result));
         return NextResponse.json({ success: true, method: 'api', data: result });
       } catch (apiError) {
-        console.error('MSG91 API failed, falling back to wa.me:', apiError);
+        console.error('MSG91 API failed:', apiError);
       }
     }
 
     const link = getWhatsAppLink(to, fallbackMessage || '');
+    console.log('Falling back to wa.me link');
     return NextResponse.json({ success: true, method: 'link', link });
 
   } catch (error) {
