@@ -12,7 +12,10 @@ export async function sendWhatsAppTemplate({ to, templateName, variables, langua
   if (!MSG91_AUTH_KEY) throw new Error('MSG91_AUTH_KEY not set');
   if (!MSG91_WHATSAPP_NUMBER) throw new Error('MSG91_WHATSAPP_NUMBER not set');
 
-  const phone = to.replace(/[^0-9]/g, '');
+  let phone = to.replace(/[^0-9]/g, '');
+  if (phone.length === 10) {
+    phone = '91' + phone;
+  }
 
   const components: Record<string, { type: string; value: string }> = {};
   variables.forEach((val, idx) => {
@@ -40,7 +43,7 @@ export async function sendWhatsAppTemplate({ to, templateName, variables, langua
 
   console.log('MSG91 request:', JSON.stringify({ ...body, payload: { ...body.payload, template: { ...body.payload.template, to_and_components: [{ to: ['REDACTED'], components }] } } }));
 
-  const response = await fetch('https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/', {
+  const response = await fetch('https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

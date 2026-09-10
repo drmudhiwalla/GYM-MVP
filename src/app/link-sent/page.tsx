@@ -22,6 +22,9 @@ export default function LinkSentPage() {
   const handleShare = async () => {
     const fallbackMessage = `Hi ${state.name}! Your gym health screening (ID: ${state.screeningId}) is ready for Part 2. Please complete the remaining assessments here: ${screeningLink}`;
 
+    // Open blank tab synchronously to bypass popup blocker
+    const whatsappTab = window.open('', '_blank');
+
     setSending(true);
     try {
       const res = await fetch('/api/whatsapp', {
@@ -29,7 +32,7 @@ export default function LinkSentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: state.whatsappNumber,
-          templateName: 'screening_part2_link',
+          templateName: 'gymmvp',
           variables: [state.name, state.screeningId, screeningLink],
           fallbackMessage,
         }),
@@ -37,14 +40,20 @@ export default function LinkSentPage() {
 
       const data = await res.json();
 
-      if (data.method === 'link') {
-        window.open(data.link, '_blank');
-      } else {
+      if (data.method === 'link' && whatsappTab) {
+        whatsappTab.location.href = data.link;
+        setSent(true);
+      } else if (whatsappTab) {
+        whatsappTab.close();
         setSent(true);
       }
     } catch {
       const phone = state.whatsappNumber.replace(/[^0-9]/g, '');
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`, '_blank');
+      if (whatsappTab) {
+        whatsappTab.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`;
+      } else {
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`, '_blank');
+      }
     }
     setSending(false);
   };

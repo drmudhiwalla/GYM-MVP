@@ -174,13 +174,15 @@ export default function StaffDashboard() {
     }
     const fallbackMessage = `Hi ${screening.name}! Your health screening (ID: ${screening.screeningId}) is complete.\n\nFinal Category: ${screening.finalCategory}\n\nDetailed results will be shared with you by the gym staff.`;
 
+    const whatsappTab = window.open('', '_blank');
+
     try {
       const res = await fetch('/api/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: screening.whatsappNumber,
-          templateName: 'screening_results',
+          templateName: 'gymmvpr',
           variables: [screening.name, screening.screeningId, screening.finalCategory],
           fallbackMessage,
         }),
@@ -188,12 +190,18 @@ export default function StaffDashboard() {
 
       const data = await res.json();
 
-      if (data.method === 'link') {
-        window.open(data.link, '_blank');
+      if (data.method === 'link' && whatsappTab) {
+        whatsappTab.location.href = data.link;
+      } else if (whatsappTab) {
+        whatsappTab.close();
       }
     } catch {
       const phone = screening.whatsappNumber.replace(/[^0-9]/g, '');
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`, '_blank');
+      if (whatsappTab) {
+        whatsappTab.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`;
+      } else {
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`, '_blank');
+      }
     }
   };
 
