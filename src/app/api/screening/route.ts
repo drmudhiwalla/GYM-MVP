@@ -37,7 +37,10 @@ export async function POST(request: Request) {
         weightKg: body.weightKg || null,
         bmiValue: body.bmiValue || null,
         bmiCategory: body.bmiCategory || null,
-        status: body.status || 'PARTIAL',
+        waistCm: body.waistCm || null,
+        briValue: body.briValue || null,
+        briCategory: body.briCategory || null,
+        status: body.status || 'REGISTERED',
       },
     });
 

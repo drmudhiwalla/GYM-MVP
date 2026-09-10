@@ -27,6 +27,23 @@ export function classifyBMI(heightCm: number, weightKg: number): {
   return { value: rounded, category };
 }
 
+// ─── BRI Classification (Body Roundness Index) ──────────────────────────────
+export function calculateBRI(waistCm: number, heightCm: number): {
+  value: number;
+  category: Category;
+} {
+  // BRI = 364.2 - 159.98 × ln(WC) - 80.25 × ln(H)
+  const bri = 364.2 - 159.98 * Math.log(waistCm) - 80.25 * Math.log(heightCm);
+  const rounded = Math.round(bri * 10) / 10;
+
+  let category: Category;
+  if (rounded < 5) category = 'GREEN';
+  else if (rounded <= 7) category = 'YELLOW';
+  else category = 'RED';
+
+  return { value: rounded, category };
+}
+
 // ─── Sleep Classification (B-PSQI adapted, 0-15) ────────────────────────────
 export function classifySleep(score: number): Category {
   if (score <= 3) return 'GREEN';

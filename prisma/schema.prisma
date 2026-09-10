@@ -32,6 +32,11 @@ model Screening {
   bmiValue        Float?    @map("bmi_value")
   bmiCategory     String?   @map("bmi_category")
 
+  // BRI (waist circumference)
+  waistCm         Float?    @map("waist_cm")
+  briValue        Float?    @map("bri_value")
+  briCategory     String?   @map("bri_category")
+
   // Sleep (B-PSQI)
   sleepScore      Int?      @map("sleep_score")
   sleepCategory   String?   @map("sleep_category")
