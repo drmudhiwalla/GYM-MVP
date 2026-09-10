@@ -6,7 +6,6 @@ import { useEffect, useState, useMemo } from 'react';
 import Footer from '@/components/Footer';
 import { categoryColors, categoryLabels } from '@/lib/classification';
 import { Category } from '@/lib/types';
-import { loadAllScreenings } from '@/lib/screening-store';
 import { ScreeningState } from '@/lib/context';
 import jsPDF from 'jspdf';
 
@@ -41,8 +40,41 @@ export default function StaffDashboard() {
   }, [status, router]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAllScreenings(loadAllScreenings());
+    fetch('/api/screening')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          const mapped = data.data.map((d: Record<string, unknown>) => ({
+            screeningId: d.screeningId,
+            createdAt: d.createdAt,
+            status: d.status,
+            whatsappNumber: d.whatsappNumber,
+            name: d.name,
+            age: d.age,
+            gender: d.gender,
+            workingStatus: d.workingStatus || '',
+            consent1: d.consent1,
+            consent2: d.consent2,
+            consent3: d.consent3,
+            bpSystolic: d.bpSystolic || 0,
+            bpDiastolic: d.bpDiastolic || 0,
+            bpCategory: d.bpCategory,
+            heightCm: d.heightCm || 0,
+            weightKg: d.weightKg || 0,
+            bmiValue: d.bmiValue || 0,
+            bmiCategory: d.bmiCategory,
+            sleepScore: d.sleepScore || 0,
+            sleepCategory: d.sleepCategory,
+            stressScore: d.stressScore || 0,
+            stressCategory: d.stressCategory,
+            familyHistory: d.familyHistory,
+            medicalHistory: d.medicalHistory,
+            finalCategory: d.finalCategory,
+          }));
+          setAllScreenings(mapped);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const records: ScreeningRecord[] = useMemo(() =>
