@@ -7,7 +7,7 @@ import { generateScreeningId } from '@/lib/utils';
 export interface ScreeningState {
   screeningId: string;
   createdAt: string;
-  status: 'PARTIAL' | 'LINK_SENT' | 'COMPLETED';
+  status: 'REGISTERED' | 'LINK_SENT' | 'COMPLETED';
 
   whatsappNumber: string;
   name: string;
@@ -27,6 +27,10 @@ export interface ScreeningState {
   bmiValue: number;
   bmiCategory: Category | null;
 
+  waistCm: number;
+  briValue: number;
+  briCategory: Category | null;
+
   sleepScore: number;
   sleepCategory: Category | null;
 
@@ -43,7 +47,7 @@ function createInitialState(): ScreeningState {
   return {
     screeningId: generateScreeningId(),
     createdAt: new Date().toISOString(),
-    status: 'PARTIAL',
+    status: 'REGISTERED',
     whatsappNumber: '',
     name: '',
     age: 0,
@@ -59,6 +63,9 @@ function createInitialState(): ScreeningState {
     weightKg: 0,
     bmiValue: 0,
     bmiCategory: null,
+    waistCm: 0,
+    briValue: 0,
+    briCategory: null,
     sleepScore: 0,
     sleepCategory: null,
     stressScore: 0,
@@ -69,42 +76,10 @@ function createInitialState(): ScreeningState {
   };
 }
 
-const STORAGE_KEY = 'drmudhiwalla_screenings';
-
-function saveScreening(state: ScreeningState) {
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    existing[state.screeningId] = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-  } catch {
-    // localStorage might be unavailable
-  }
-}
-
-function loadScreening(screeningId: string): ScreeningState | null {
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return existing[screeningId] || null;
-  } catch {
-    return null;
-  }
-}
-
-function loadAllScreenings(): ScreeningState[] {
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return Object.values(existing) as ScreeningState[];
-  } catch {
-    return [];
-  }
-}
-
 interface ScreeningContextType {
   state: ScreeningState;
   updateState: (updates: Partial<ScreeningState>) => void;
   reset: () => void;
-  loadById: (screeningId: string) => ScreeningState | null;
-  loadAll: () => ScreeningState[];
 }
 
 const ScreeningContext = createContext<ScreeningContextType | undefined>(undefined);
@@ -113,23 +88,15 @@ export function ScreeningProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ScreeningState>(createInitialState);
 
   const updateState = (updates: Partial<ScreeningState>) => {
-    setState((prev) => {
-      const next = { ...prev, ...updates };
-      saveScreening(next);
-      return next;
-    });
+    setState((prev) => ({ ...prev, ...updates }));
   };
 
   const reset = () => {
-    const fresh = createInitialState();
-    setState(fresh);
+    setState(createInitialState());
   };
 
-  const loadById = (screeningId: string) => loadScreening(screeningId);
-  const loadAll = () => loadAllScreenings();
-
   return (
-    <ScreeningContext.Provider value={{ state, updateState, reset, loadById, loadAll }}>
+    <ScreeningContext.Provider value={{ state, updateState, reset }}>
       {children}
     </ScreeningContext.Provider>
   );

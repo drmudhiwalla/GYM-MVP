@@ -2,7 +2,7 @@
   "name": "DrMudhiwalla Health Screening",
   "short_name": "DrMudhiwalla",
   "description": "Preventive health screening for gym members",
-  "start_url": "/consent",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#35AEF4",
