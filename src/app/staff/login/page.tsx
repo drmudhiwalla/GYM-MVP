@@ -51,7 +51,7 @@ export default function StaffLoginPage() {
             <input
               type="email"
               className="text-input"
-              placeholder="admin@drmudhiwalla.com"
+              placeholder="Enter email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(''); }}
               required
@@ -90,14 +90,6 @@ export default function StaffLoginPage() {
             {loading ? 'Signing in...' : 'Login'}
           </button>
         </form>
-
-        <div style={{
-          marginTop: 24, padding: '12px 16px', background: '#f8fafc',
-          borderRadius: 10, fontSize: 12, color: '#94a3b8', lineHeight: 1.6,
-        }}>
-          <strong>Demo Credentials:</strong><br />
-          admin@drmudiwalla.com / admin987
-        </div>
       </div>
       <Footer />
     </div>

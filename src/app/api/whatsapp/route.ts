@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { sendWhatsAppTemplate, getWhatsAppLink } from '@/lib/whatsapp';
 
-// POST /api/whatsapp - Send WhatsApp message
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session || (session.user as { role?: string })?.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { to, templateName, variables, fallbackMessage } = body;
 
@@ -17,7 +10,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 });
     }
 
-    // Try API if configured
     if (process.env.MSG91_AUTH_KEY && templateName) {
       try {
         const result = await sendWhatsAppTemplate({
@@ -31,7 +23,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fallback: return wa.me link
     const link = getWhatsAppLink(to, fallbackMessage || '');
     return NextResponse.json({ success: true, method: 'link', link });
 
