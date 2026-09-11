@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 import Footer from '@/components/Footer';
+import CombinedPDFReport from '@/components/CombinedPDFReport';
 import { categoryColors, categoryLabels, classifyBP, classifyBMI, calculateBRI } from '@/lib/classification';
 import { Category } from '@/lib/types';
 
@@ -43,6 +44,8 @@ export default function StaffDashboard() {
   const [waist, setWaist] = useState('');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/staff/login');
@@ -80,6 +83,79 @@ export default function StaffDashboard() {
   };
 
   useEffect(() => { fetchScreenings(); }, []);
+
+  // Selection helpers
+  const filtered = useMemo(() => {
+    return allScreenings.filter((s) => {
+      const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.whatsappNumber.includes(search) ||
+        s.screeningId.toLowerCase().includes(search.toLowerCase());
+      const matchFilter = filter === 'ALL' || s.status === filter;
+      return matchSearch && matchFilter;
+    });
+  }, [allScreenings, search, filter]);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.screeningId));
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((s) => s.screeningId)));
+    }
+  };
+
+  const toggleSelect = (screeningId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(screeningId)) {
+        next.delete(screeningId);
+      } else {
+        next.add(screeningId);
+      }
+      return next;
+    });
+  };
+
+  // Delete single participant
+  const handleDelete = async (s: ScreeningRecord) => {
+    if (!confirm(`Delete screening for ${s.name} (${s.screeningId})? This cannot be undone.`)) return;
+    setDeleting(s.screeningId);
+    try {
+      const res = await fetch(`/api/screening/${s.screeningId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSelectedIds((prev) => { const n = new Set(prev); n.delete(s.screeningId); return n; });
+        fetchScreenings();
+      } else {
+        alert('Failed to delete');
+      }
+    } catch {
+      alert('Error deleting');
+    }
+    setDeleting(null);
+  };
+
+  // Delete selected participants
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.size} selected participant(s)? This cannot be undone.`)) return;
+    setDeleting('bulk');
+    try {
+      const res = await fetch('/api/screening', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        setSelectedIds(new Set());
+        fetchScreenings();
+      } else {
+        alert('Failed to delete');
+      }
+    } catch {
+      alert('Error deleting');
+    }
+    setDeleting(null);
+  };
 
   const openMeasure = (s: ScreeningRecord) => {
     setMeasureScreening(s);
@@ -199,14 +275,6 @@ export default function StaffDashboard() {
 
   if (!session) return null;
 
-  const filtered = allScreenings.filter((s) => {
-    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.whatsappNumber.includes(search) ||
-      s.screeningId.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === 'ALL' || s.status === filter;
-    return matchSearch && matchFilter;
-  });
-
   const statusCounts = {
     REGISTERED: allScreenings.filter((s) => s.status === 'REGISTERED').length,
     LINK_SENT: allScreenings.filter((s) => s.status === 'LINK_SENT').length,
@@ -215,6 +283,8 @@ export default function StaffDashboard() {
   };
 
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const selectedParticipants = allScreenings.filter((s) => selectedIds.has(s.screeningId));
 
   return (
     <div className="form-wrapper">
@@ -253,19 +323,76 @@ export default function StaffDashboard() {
         {/* Search */}
         <input type="text" className="text-input" placeholder="Search by name, WhatsApp, or Screening ID..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 16 }} />
 
+        {/* Selection toolbar */}
+        {selectedIds.size > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10,
+            padding: '10px 16px', marginBottom: 16, flexWrap: 'wrap', gap: 8,
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0369a1' }}>
+              {selectedIds.size} selected
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <CombinedPDFReport participants={selectedParticipants} />
+              <button
+                onClick={handleDeleteSelected}
+                disabled={deleting === 'bulk'}
+                style={{
+                  padding: '8px 16px', borderRadius: 50, fontSize: 12, fontWeight: 600,
+                  background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer',
+                  opacity: deleting === 'bulk' ? 0.5 : 1,
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Delete ({selectedIds.size})
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                style={{
+                  padding: '8px 16px', borderRadius: 50, fontSize: 12, fontWeight: 600,
+                  background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['ID', 'Name', 'Age', 'Status', 'Date', 'BP', 'BMI', 'BRI', 'Sleep', 'Stress', 'Final', 'Actions'].map((h) => (
-                  <th key={h} style={{ padding: '10px 6px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: 10, textTransform: 'uppercase' }}>{h}</th>
+                {['', 'ID', 'Name', 'Age', 'Status', 'Date', 'BP', 'BMI', 'BRI', 'Sleep', 'Stress', 'Final', 'Actions'].map((h) => (
+                  <th key={h} style={{ padding: '10px 6px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: 10, textTransform: 'uppercase' }}>
+                    {h === '' ? (
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAll}
+                        style={{ width: 16, height: 16, accentColor: '#35AEF4', cursor: 'pointer' }}
+                      />
+                    ) : h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((s) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9', background: selectedIds.has(s.screeningId) ? '#f0f9ff' : undefined }}>
+                  <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(s.screeningId)}
+                      onChange={() => toggleSelect(s.screeningId)}
+                      style={{ width: 16, height: 16, accentColor: '#35AEF4', cursor: 'pointer' }}
+                    />
+                  </td>
                   <td style={{ padding: '8px 6px', fontFamily: 'monospace', fontSize: 10, color: '#35AEF4', fontWeight: 600, textAlign: 'center' }}>{s.screeningId}</td>
                   <td style={{ padding: '8px 6px', fontWeight: 500, color: '#0f172a' }}>{s.name}</td>
                   <td style={{ padding: '8px 6px', textAlign: 'center', color: '#64748b' }}>{s.age}</td>
@@ -286,7 +413,7 @@ export default function StaffDashboard() {
                     {s.finalCategory ? <span className={`param-badge ${s.finalCategory}`} style={{ fontSize: 9, padding: '2px 6px', fontWeight: 700 }}>{s.finalCategory}</span> : <span style={{ fontSize: 9, color: '#cbd5e1' }}>—</span>}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
                       {s.status === 'REGISTERED' && (
                         <button onClick={() => openMeasure(s)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600, background: '#35AEF4', color: '#fff', border: 'none', cursor: 'pointer' }}>Measure</button>
                       )}
@@ -299,12 +426,23 @@ export default function StaffDashboard() {
                           <button onClick={() => handleSendResults(s)} disabled={sending === s.screeningId} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600, background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer', opacity: sending === s.screeningId ? 0.6 : 1 }}>WA</button>
                         </>
                       )}
+                      <button
+                        onClick={() => handleDelete(s)}
+                        disabled={deleting === s.screeningId}
+                        style={{
+                          padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600,
+                          background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer',
+                          opacity: deleting === s.screeningId ? 0.5 : 1,
+                        }}
+                      >
+                        {deleting === s.screeningId ? '...' : 'Del'}
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={12} style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>No screenings found</td></tr>
+                <tr><td colSpan={13} style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>No screenings found</td></tr>
               )}
             </tbody>
           </table>
@@ -345,7 +483,6 @@ export default function StaffDashboard() {
                 <input type="number" className="text-input" placeholder="e.g. 85" value={waist} onChange={(e) => setWaist(e.target.value)} style={{ fontSize: 14 }} />
               </div>
 
-              {/* Live preview */}
               {bpSys && bpDia && height && weight && waist && (
                 <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 12 }}>
                   <div style={{ fontWeight: 600, marginBottom: 6 }}>Preview:</div>

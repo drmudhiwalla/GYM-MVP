@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
 import ValidationModal from '@/components/ValidationModal';
@@ -19,6 +19,22 @@ export default function HomePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  const handleScroll = useCallback(() => {
+    const logo = document.querySelector('.text-logo') as HTMLElement;
+    if (logo) {
+      const scrollY = window.scrollY;
+      const fadeStart = 50;
+      const fadeEnd = 200;
+      const opacity = Math.max(0, 1 - (scrollY - fadeStart) / (fadeEnd - fadeStart));
+      logo.style.opacity = String(opacity);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -70,6 +86,7 @@ export default function HomePage() {
   return (
     <div style={{ width: '100vw', minHeight: '100vh', position: 'relative' }}>
       <button
+        className="staff-login-btn"
         onClick={() => router.push('/staff/login')}
         style={{
           position: 'fixed', top: 20, right: 20, zIndex: 20,
@@ -205,7 +222,7 @@ export default function HomePage() {
             onClick={handleSubmit}
             disabled={loading}
           >
-            {loading ? 'Registering...' : 'Register &rarr;'}
+            {loading ? 'Registering...' : 'Register →'}
           </button>
         </div>
       </div>

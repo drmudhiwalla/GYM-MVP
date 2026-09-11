@@ -51,6 +51,30 @@ export async function POST(request: Request) {
   }
 }
 
+// DELETE /api/screening - Bulk delete screenings (admin only)
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+    if (!session || (session.user as { role?: string })?.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { ids } = await request.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'No IDs provided' }, { status: 400 });
+    }
+
+    await prisma.screening.deleteMany({
+      where: { screeningId: { in: ids } },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/screening error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // GET /api/screening - List all screenings (admin only)
 export async function GET() {
   try {
