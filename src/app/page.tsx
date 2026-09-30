@@ -59,7 +59,7 @@ export default function HomePage() {
     const screeningId = generateScreeningId();
 
     try {
-      await fetch('/api/screening', {
+      const res = await fetch('/api/screening', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,9 +76,26 @@ export default function HomePage() {
         }),
       });
 
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Registration failed (${res.status})`);
+      }
+
+      fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: whatsapp.trim(),
+          templateName: 'gymmvp',
+          variables: [name.trim(), screeningId, window.location.origin],
+          fallbackMessage: `Hi ${name.trim()}! You are registered for the gym health screening. Your Screening ID: ${screeningId}. Please save it.`,
+        }),
+      }).catch((err) => console.error('WhatsApp send failed:', err));
+
       router.push(`/registered?id=${screeningId}`);
-    } catch {
-      alert('Something went wrong. Please try again.');
+    } catch (err) {
+      console.error('Registration failed:', err);
+      alert(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     }
     setLoading(false);
   };
