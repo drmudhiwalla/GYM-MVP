@@ -1,0 +1,77 @@
+==============================================
+This Project - Notes & Documentation
+==============================================
+
+What it is
+Screening web app for gyms. A staff member registers a gym-goer, takes
+their BP / BMI / waist, sends them a WhatsApp link, and the member then
+does a sleep + stress questionnaire on their phone. Everything combines
+into one risk result (GREEN / YELLOW / RED) plus a PDF report.
+
+Why we built it
+- The website already had free calculators, but no way to run a real
+  screening and keep the results.
+- Wanted to try the idea in gyms first before scaling to banks.
+
+Tech stack
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Tailwind CSS v4
+- Prisma + SQLite (Postgres later is just a config swap)
+- NextAuth for the staff login
+- MSG91 for WhatsApp template messages (wa.me link as fallback)
+- jsPDF for PDF reports, made in the browser
+
+How it works (flow)
+   member registers at gym counter
+            v
+   record saved (REGISTERED)
+            v
+   staff enters BP, height/weight, waist
+            v
+   staff sends WhatsApp link (LINK_SENT)
+            v
+   member answers sleep questionnaire
+            v
+   member answers stress questionnaire
+            v
+   final risk computed, results page shown
+            v
+   member downloads PDF / staff exports combined PDF
+
+Data model
+One table (screenings) holding: name, age, gender, WhatsApp number,
+the 3 consent checkboxes, BP/BMI/BRI values + their categories, sleep
+and stress scores + categories, family/medical history, final category,
+and a status that moves REGISTERED -> LINK_SENT -> COMPLETED.
+
+Risk logic (short version)
+- BP red OR medical history OR 2+ red among the rest        -> RED
+- family history OR BP yellow OR any yellow or one red      -> YELLOW
+- otherwise                                                 -> GREEN
+
+This logic was borrowed from the calculators built earlier in the
+website project and used as-is.
+
+API endpoints
+/api/screening       create (public), list + bulk delete (staff)
+/api/screening/:id   get (public), update, delete (staff)
+/api/whatsapp        send WhatsApp message or fallback link
+
+Why this stack
+- Next.js keeps the pages and API in one place - no second project to
+  run or deploy.
+- Prisma made schema changes painless, and the workflow changed a lot
+  while building (started as a localStorage prototype, later moved to a
+  database and a register-first flow).
+- WhatsApp is how gym members actually communicate - the most reliable
+  way to reach them - and the wa.me fallback means it still works if the
+  messaging API fails.
+- PDFs generated in the browser means no file server and no storage.
+- Only staff gets a login; members use a link, so no account friction.
+
+How to run it
+   cp .env.example .env   # fill in the values
+   npm install
+   npm run db:push        # creates the SQLite schema
+   npm run db:seed        # optional test data
+   npm run dev            # localhost:3000

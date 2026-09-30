@@ -49,6 +49,11 @@ model Screening {
   familyHistory   Boolean?  @map("family_history")
   medicalHistory  Boolean?  @map("medical_history")
 
+  // Smoking
+  smokingCurrent   Boolean? @map("smoking_current")
+  smokingPast      Boolean? @map("smoking_past")
+  smokingCategory  String?  @map("smoking_category")
+
   // Final Classification
   finalCategory   String?   @map("final_category")
   status          String    @default("PARTIAL") @map("status")

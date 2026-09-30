@@ -28,17 +28,21 @@ export function classifyBMI(heightCm: number, weightKg: number): {
 }
 
 // ─── BRI Classification (Body Roundness Index) ──────────────────────────────
+// Formula: BRI = 364.2 - 365.5 × eccentricity
+// eccentricity = sqrt(1 - [(WC / (2π))² / (0.5 × H)²])
+// Reference: Thomas et al., 2013 (NHANES III)
 export function calculateBRI(waistCm: number, heightCm: number): {
   value: number;
   category: Category;
 } {
-  // BRI = 364.2 - 159.98 × ln(WC) - 80.25 × ln(H)
-  const bri = 364.2 - 159.98 * Math.log(waistCm) - 80.25 * Math.log(heightCm);
+  const whtr = waistCm / heightCm;
+  const eccentricity = Math.sqrt(1 - Math.pow(whtr / Math.PI, 2));
+  const bri = 364.2 - 365.5 * eccentricity;
   const rounded = Math.round(bri * 10) / 10;
 
   let category: Category;
   if (rounded < 5) category = 'GREEN';
-  else if (rounded <= 7) category = 'YELLOW';
+  else if (rounded <= 10) category = 'YELLOW';
   else category = 'RED';
 
   return { value: rounded, category };
@@ -56,6 +60,16 @@ export function classifyStress(score: number): Category {
   if (score <= 4) return 'GREEN';
   if (score <= 7) return 'YELLOW';
   return 'RED';
+}
+
+// ─── Smoking Classification (current + past tobacco use) ──────────────────────
+// Current smoker (Yes + Yes, or Yes + No) → RED
+// Past smoker, not current (No + Yes)      → YELLOW
+// Never smoked (No + No)                   → GREEN
+export function classifySmoking(currentlySmokes: boolean, smokedInPast: boolean): Category {
+  if (currentlySmokes) return 'RED';
+  if (smokedInPast) return 'YELLOW';
+  return 'GREEN';
 }
 
 // ─── Final Category Logic ────────────────────────────────────────────────────

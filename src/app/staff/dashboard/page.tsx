@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 import Footer from '@/components/Footer';
 import CombinedPDFReport from '@/components/CombinedPDFReport';
-import { categoryColors, categoryLabels, classifyBP, classifyBMI, calculateBRI } from '@/lib/classification';
+import { classifyBP, classifyBMI, calculateBRI } from '@/lib/classification';
 import { Category } from '@/lib/types';
 
 interface ScreeningRecord {
@@ -201,7 +201,7 @@ export default function StaffDashboard() {
           briCategory: bri.category,
           status: 'LINK_SENT',
         }),
-      });
+      }).then((r) => { if (!r.ok) throw new Error('save failed'); });
 
       const part2Link = `${window.location.origin}/screening/${measureScreening.screeningId}`;
       const fallbackMessage = `Hi ${measureScreening.name}! Your gym health screening (ID: ${measureScreening.screeningId}) is ready for Part 2. Please complete the remaining assessments here: ${part2Link}`;
@@ -219,7 +219,8 @@ export default function StaffDashboard() {
 
       const data = await res.json();
       if (data.method === 'link') {
-        window.open(data.link, '_blank');
+        await navigator.clipboard.writeText(data.link);
+        alert('WhatsApp link copied to clipboard! Paste it in a chat to send.');
       }
 
       setMeasureScreening(null);
@@ -234,7 +235,6 @@ export default function StaffDashboard() {
     if (!s.finalCategory) return;
     setSending(s.screeningId);
     const fallbackMessage = `Hi ${s.name}! Your health screening (ID: ${s.screeningId}) is complete.\n\nFinal Category: ${s.finalCategory}\n\nDetailed results will be shared with you by the gym staff.`;
-    const whatsappTab = window.open('', '_blank');
 
     try {
       const res = await fetch('/api/whatsapp', {
@@ -248,16 +248,15 @@ export default function StaffDashboard() {
         }),
       });
       const data = await res.json();
-      if (data.method === 'link' && whatsappTab) {
-        whatsappTab.location.href = data.link;
-      } else if (whatsappTab) {
-        whatsappTab.close();
+      if (data.method === 'link') {
+        await navigator.clipboard.writeText(data.link);
+        alert('WhatsApp link copied to clipboard! Paste it in a chat to send.');
       }
     } catch {
       const phone = s.whatsappNumber.replace(/[^0-9]/g, '');
-      if (whatsappTab) {
-        whatsappTab.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`;
-      }
+      const link = `https://wa.me/${phone}?text=${encodeURIComponent(fallbackMessage)}`;
+      await navigator.clipboard.writeText(link);
+      alert('WhatsApp link copied to clipboard! Paste it in a chat to send.');
     }
     setSending(null);
   };

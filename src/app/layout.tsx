@@ -2,10 +2,14 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ScreeningProvider } from "@/lib/context";
 import Providers from "@/components/Providers";
+import Logo from "@/components/Logo";
 
 export const metadata: Metadata = {
   title: "DrMudhiwalla - Gym Health Screening",
   description: "Preventive health screening for gym members",
+  icons: {
+    icon: '/logo.png',
+  },
 };
 
 export const viewport: Viewport = {
@@ -27,10 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         <Providers>
           <ScreeningProvider>
-            <a href="/" className="text-logo" style={{ textDecoration: 'none' }}>
-              <div className="logo-title">DrMudhiwalla</div>
-              <div className="logo-subtitle">HealthTech <span className="pvt-ltd">Pvt Ltd</span></div>
-            </a>
+            <Logo />
             {children}
           </ScreeningProvider>
         </Providers>

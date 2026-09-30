@@ -1,46 +1,24 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
 import ValidationModal from '@/components/ValidationModal';
-import { ScreeningState } from '@/lib/context';
-import { calculateFinalCategory } from '@/lib/classification';
+import { useScreening, patchScreening } from '@/lib/screening-api';
+import { calculateFinalCategory, classifySmoking } from '@/lib/classification';
 
 export default function ScreeningHistory({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const [screening, setScreening] = useState<ScreeningState | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { screening, loading } = useScreening(id);
 
   const [familyHistory, setFamilyHistory] = useState<string | null>(null);
   const [medicalHistory, setMedicalHistory] = useState<string | null>(null);
+  const [smokingCurrent, setSmokingCurrent] = useState<string | null>(null);
+  const [smokingPast, setSmokingPast] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
-
-  useEffect(() => {
-    fetch(`/api/screening/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data) {
-          const d = data.data;
-          setScreening({
-            screeningId: d.screeningId, createdAt: d.createdAt, status: d.status,
-            whatsappNumber: d.whatsappNumber, name: d.name, age: d.age, gender: d.gender,
-            workingStatus: d.workingStatus || '', consent1: d.consent1, consent2: d.consent2, consent3: d.consent3,
-            bpSystolic: d.bpSystolic || 0, bpDiastolic: d.bpDiastolic || 0, bpCategory: d.bpCategory,
-            heightCm: d.heightCm || 0, weightKg: d.weightKg || 0,             bmiValue: d.bmiValue || 0, bmiCategory: d.bmiCategory,
-            waistCm: d.waistCm || 0, briValue: d.briValue || 0, briCategory: d.briCategory || null,
-            sleepScore: d.sleepScore || 0, sleepCategory: d.sleepCategory,
-            stressScore: d.stressScore || 0, stressCategory: d.stressCategory,
-            familyHistory: d.familyHistory, medicalHistory: d.medicalHistory, finalCategory: d.finalCategory,
-          });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
 
   if (loading) {
     return (
@@ -80,11 +58,28 @@ export default function ScreeningHistory({ params }: { params: Promise<{ id: str
     hi: 'क्या आपको कभी diabetes, high blood pressure, heart disease या High cholesterol का पता चला है, या क्या आप वर्तमान में इनमें से किसी के लिए दवा ले रहे हैं?',
   };
 
-  const handleFinish = () => {
+  const smokingQ = {
+    en: 'Do you currently smoke any tobacco products, such as cigarettes, bidi or hookah?',
+    hi: 'क्या आप वर्तमान में कोई तंबाकू उत्पाद, जैसे सिगरेट, बीड़ी या हुक्का, पीते हैं?',
+  };
+
+  const smokingPastQ = {
+    en: 'In the past, did you ever smoke any tobacco products?',
+    hi: 'क्या आपने पहले कभी कोई तंबाकू उत्पाद, जैसे सिगरेट, बीड़ी या हुक्का, पिया था?',
+  };
+
+  const yesNoOptions = [
+    { value: 'yes', en: 'Yes', hi: 'हाँ' },
+    { value: 'no', en: 'No', hi: 'नहीं' },
+  ];
+
+  const handleFinish = async () => {
     const errs: Record<string, string> = {};
     const missing: string[] = [];
     if (!familyHistory) { errs.family = 'Please select an option'; missing.push('Family History'); }
     if (!medicalHistory) { errs.medical = 'Please select Yes or No'; missing.push('Medical History'); }
+    if (!smokingCurrent) { errs.smokingCurrent = 'Please select Yes or No'; missing.push('Smoking · Current'); }
+    if (!smokingPast) { errs.smokingPast = 'Please select Yes or No'; missing.push('Smoking · Past'); }
     setErrors(errs);
     if (missing.length > 0) {
       setMissingFields(missing);
@@ -92,8 +87,11 @@ export default function ScreeningHistory({ params }: { params: Promise<{ id: str
       return;
     }
 
-    const familyBool = familyHistory === 'yes' || familyHistory === 'one' || familyHistory === 'both';
+    const familyBool = familyHistory === 'one' || familyHistory === 'both';
     const medicalBool = medicalHistory === 'yes';
+    const currentBool = smokingCurrent === 'yes';
+    const pastBool = smokingPast === 'yes';
+    const smokingCat = classifySmoking(currentBool, pastBool);
 
     const finalCat = calculateFinalCategory({
       bpCategory: screening!.bpCategory!,
@@ -104,16 +102,20 @@ export default function ScreeningHistory({ params }: { params: Promise<{ id: str
       stressCategory: screening!.stressCategory!,
     });
 
-    fetch(`/api/screening/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await patchScreening(id, {
         familyHistory: familyBool,
         medicalHistory: medicalBool,
+        smokingCurrent: currentBool,
+        smokingPast: pastBool,
+        smokingCategory: smokingCat,
         finalCategory: finalCat,
         status: 'COMPLETED',
-      }),
-    }).catch(() => {});
+      });
+    } catch {
+      alert('Could not save results. Please try again.');
+      return;
+    }
 
     router.push(`/screening/${id}/history/completed`);
   };
@@ -133,10 +135,10 @@ export default function ScreeningHistory({ params }: { params: Promise<{ id: str
 
         <div className="intro-section" style={{ marginBottom: 28 }}>
           <div className="intro-icon">📋</div>
-          <h2>Family & Medical History</h2>
-          <div className="hindi-title">पारिवारिक और चिकित्सा इतिहास</div>
-          <p>Please answer the following questions about your family and medical history.</p>
-          <p className="hindi-desc">कृपया अपने परिवार और चिकित्सा इतिहास के बारे में निम्नलिखित प्रश्नों के उत्तर दें।</p>
+          <h2>Family, Medical &amp; Smoking History</h2>
+          <div className="hindi-title">पारिवारिक, चिकित्सा और धूम्रपान इतिहास</div>
+          <p>Please answer the following questions about your family, medical and smoking history.</p>
+          <p className="hindi-desc">कृपया अपने परिवार, चिकित्सा और धूम्रपान इतिहास के बारे में निम्नलिखित प्रश्नों के उत्तर दें।</p>
         </div>
 
         {/* Family History */}
@@ -203,6 +205,66 @@ export default function ScreeningHistory({ params }: { params: Promise<{ id: str
             </label>
           </div>
           {errors.medical && <div className="error-msg show">{errors.medical}</div>}
+        </div>
+
+        {/* Smoking — Current */}
+        <div className="field-group">
+          <div className="field-label" style={{ marginBottom: 8 }}>
+            Q3. Smoking <span className="hindi">धूम्रपान</span> <span className="required">*</span>
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', marginBottom: 8, lineHeight: 1.6, fontWeight: 500 }}>
+            {smokingQ.en}
+          </p>
+          <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12, lineHeight: 1.6 }}>
+            {smokingQ.hi}
+          </p>
+          <div className="radio-group">
+            {yesNoOptions.map((opt) => (
+              <label key={opt.value} className="radio-option">
+                <input
+                  type="radio"
+                  name="smokingCurrent"
+                  checked={smokingCurrent === opt.value}
+                  onChange={() => { setSmokingCurrent(opt.value); setErrors((p) => ({ ...p, smokingCurrent: '' })); }}
+                />
+                <span className="radio-circle" />
+                <span className="radio-label">
+                  {opt.en} <span className="hindi-option">{opt.hi}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {errors.smokingCurrent && <div className="error-msg show">{errors.smokingCurrent}</div>}
+        </div>
+
+        {/* Smoking — Past */}
+        <div className="field-group">
+          <div className="field-label" style={{ marginBottom: 8 }}>
+            Q4. Smoking <span className="hindi">धूम्रपान</span> <span className="required">*</span>
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', marginBottom: 8, lineHeight: 1.6, fontWeight: 500 }}>
+            {smokingPastQ.en}
+          </p>
+          <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12, lineHeight: 1.6 }}>
+            {smokingPastQ.hi}
+          </p>
+          <div className="radio-group">
+            {yesNoOptions.map((opt) => (
+              <label key={opt.value} className="radio-option">
+                <input
+                  type="radio"
+                  name="smokingPast"
+                  checked={smokingPast === opt.value}
+                  onChange={() => { setSmokingPast(opt.value); setErrors((p) => ({ ...p, smokingPast: '' })); }}
+                />
+                <span className="radio-circle" />
+                <span className="radio-label">
+                  {opt.en} <span className="hindi-option">{opt.hi}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {errors.smokingPast && <div className="error-msg show">{errors.smokingPast}</div>}
         </div>
 
         <div className="btn-row">

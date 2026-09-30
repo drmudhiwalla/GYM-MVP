@@ -34,7 +34,12 @@ export interface ScreeningData {
   familyHistory: boolean;
   medicalHistory: boolean;
 
+  // Smoking
+  smokingCurrent: boolean;
+  smokingPast: boolean;
+  smokingCategory: Category;
+
   // Final
   finalCategory: Category;
-  status: 'PARTIAL' | 'LINK_SENT' | 'COMPLETED';
+  status: 'REGISTERED' | 'LINK_SENT' | 'COMPLETED';
 }

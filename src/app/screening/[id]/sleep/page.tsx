@@ -1,10 +1,10 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
 import ValidationModal from '@/components/ValidationModal';
-import { ScreeningState } from '@/lib/context';
+import { useScreening, patchScreening } from '@/lib/screening-api';
 import { calculateSleepScore, SleepAnswers } from '@/lib/sleep';
 import { classifySleep, categoryColors } from '@/lib/classification';
 import { Category } from '@/lib/types';
@@ -12,8 +12,7 @@ import { Category } from '@/lib/types';
 export default function ScreeningSleep({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const [screening, setScreening] = useState<ScreeningState | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { screening, loading } = useScreening(id);
 
   const [bedHH, setBedHH] = useState('');
   const [bedMM, setBedMM] = useState('');
@@ -33,29 +32,6 @@ export default function ScreeningSleep({ params }: { params: Promise<{ id: strin
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
-
-  useEffect(() => {
-    fetch(`/api/screening/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data) {
-          const d = data.data;
-          setScreening({
-            screeningId: d.screeningId, createdAt: d.createdAt, status: d.status,
-            whatsappNumber: d.whatsappNumber, name: d.name, age: d.age, gender: d.gender,
-            workingStatus: d.workingStatus || '', consent1: d.consent1, consent2: d.consent2, consent3: d.consent3,
-            bpSystolic: d.bpSystolic || 0, bpDiastolic: d.bpDiastolic || 0, bpCategory: d.bpCategory,
-            heightCm: d.heightCm || 0, weightKg: d.weightKg || 0,             bmiValue: d.bmiValue || 0, bmiCategory: d.bmiCategory,
-            waistCm: d.waistCm || 0, briValue: d.briValue || 0, briCategory: d.briCategory || null,
-            sleepScore: d.sleepScore || 0, sleepCategory: d.sleepCategory,
-            stressScore: d.stressScore || 0, stressCategory: d.stressCategory,
-            familyHistory: d.familyHistory, medicalHistory: d.medicalHistory, finalCategory: d.finalCategory,
-          });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
 
   if (loading) {
     return (
@@ -117,13 +93,14 @@ export default function ScreeningSleep({ params }: { params: Promise<{ id: strin
     setShowResult(true);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (result && resultCategory) {
-      fetch(`/api/screening/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sleepScore: result.globalScore, sleepCategory: resultCategory }),
-      }).catch(() => {});
+      try {
+        await patchScreening(id, { sleepScore: result.globalScore, sleepCategory: resultCategory });
+      } catch {
+        alert('Could not save sleep score. Please try again.');
+        return;
+      }
     }
     router.push(`/screening/${id}/sleep/completed`);
   };

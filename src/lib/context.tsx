@@ -40,6 +40,10 @@ export interface ScreeningState {
   familyHistory: boolean | null;
   medicalHistory: boolean | null;
 
+  smokingCurrent: boolean | null;
+  smokingPast: boolean | null;
+  smokingCategory: Category | null;
+
   finalCategory: Category | null;
 }
 
@@ -72,6 +76,9 @@ function createInitialState(): ScreeningState {
     stressCategory: null,
     familyHistory: null,
     medicalHistory: null,
+    smokingCurrent: null,
+    smokingPast: null,
+    smokingCategory: null,
     finalCategory: null,
   };
 }

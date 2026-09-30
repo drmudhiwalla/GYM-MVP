@@ -10,7 +10,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 });
     }
 
-    const hasMsg91 = !!process.env.MSG91_AUTH_KEY;
+    const msg91Key = process.env.MSG91_AUTH_KEY || '';
+    const hasMsg91 = msg91Key.length > 10 && !msg91Key.startsWith('your_');
     console.log(`WhatsApp request: to=${to}, template=${templateName}, hasMsg91=${hasMsg91}`);
 
     if (hasMsg91 && templateName) {

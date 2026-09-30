@@ -1,23 +1,45 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
-import { ScreeningState } from '@/lib/context';
-import { categoryColors } from '@/lib/classification';
+import { useScreening } from '@/lib/screening-api';
 import { Category } from '@/lib/types';
 import PDFReport from '@/components/PDFReport';
+import {
+  IconHeartPulse,
+  IconScale,
+  IconMoon,
+  IconBrain,
+  IconUsers,
+  IconMedical,
+  IconSmoke,
+  IconRuler,
+  IconDumbbell,
+} from '@/components/ReportIcons';
 
-const categoryBg: Record<Category, string> = {
-  GREEN: '#dcfce7',
-  YELLOW: '#fef9c3',
-  RED: '#fee2e2',
+const catMeta: Record<Category, { title: string; color: string; desc: string }> = {
+  GREEN: {
+    title: 'Low Risk',
+    color: '#16A34A',
+    desc: 'You are in a healthy zone. Keep up what is working.',
+  },
+  YELLOW: {
+    title: 'Potential Risk',
+    color: '#F59E0B',
+    desc: 'A few factors need attention before they progress.',
+  },
+  RED: {
+    title: 'High Risk',
+    color: '#EF4444',
+    desc: 'We strongly recommend booking a clinician consultation.',
+  },
 };
 
-const categoryText: Record<Category, string> = {
-  GREEN: '#16a34a',
-  YELLOW: '#ca8a04',
-  RED: '#dc2626',
+const segColor: Record<Category, string> = {
+  GREEN: '#16A34A',
+  YELLOW: '#F59E0B',
+  RED: '#EF4444',
 };
 
 const categoryLabel: Record<Category, string> = {
@@ -26,34 +48,46 @@ const categoryLabel: Record<Category, string> = {
   RED: 'HIGH',
 };
 
+function RiskGauge({ score }: { score: number }) {
+  const cx = 120;
+  const cy = 120;
+  const r = 92;
+  const frac = Math.max(0, Math.min(1, score / 5));
+  const ang = Math.PI * (1 - frac);
+  const nx = cx + (r - 34) * Math.cos(ang);
+  const ny = cy - (r - 34) * Math.sin(ang);
+  const px = cx + r * Math.cos(ang);
+  const py = cy - r * Math.sin(ang);
+  return (
+    <svg width="240" height="140" viewBox="0 0 240 140" aria-hidden="true">
+      <defs>
+        <linearGradient id="srRiskGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#16A34A" />
+          <stop offset="45%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#EF4444" />
+        </linearGradient>
+      </defs>
+      <path
+        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none"
+        stroke="url(#srRiskGrad)"
+        strokeWidth="17"
+        strokeLinecap="round"
+      />
+      <circle cx={px} cy={py} r="8" fill="#FFFFFF" stroke="#0F172A" strokeWidth="3" />
+      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#0F172A" strokeWidth="5" strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r="9" fill="#0F172A" />
+      <circle cx={cx} cy={cy} r="3.5" fill="#FFFFFF" />
+      <text x={cx - r} y="138" fontSize="11" fontWeight="600" fill="#64748B" letterSpacing="1" textAnchor="middle">LOW</text>
+      <text x={cx + r} y="138" fontSize="11" fontWeight="600" fill="#64748B" letterSpacing="1" textAnchor="middle">HIGH</text>
+    </svg>
+  );
+}
+
 export default function ScreeningResults({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const [screening, setScreening] = useState<ScreeningState | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/screening/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data) {
-          const d = data.data;
-          setScreening({
-            screeningId: d.screeningId, createdAt: d.createdAt, status: d.status,
-            whatsappNumber: d.whatsappNumber, name: d.name, age: d.age, gender: d.gender,
-            workingStatus: d.workingStatus || '', consent1: d.consent1, consent2: d.consent2, consent3: d.consent3,
-            bpSystolic: d.bpSystolic || 0, bpDiastolic: d.bpDiastolic || 0, bpCategory: d.bpCategory,
-            heightCm: d.heightCm || 0, weightKg: d.weightKg || 0,             bmiValue: d.bmiValue || 0, bmiCategory: d.bmiCategory,
-            waistCm: d.waistCm || 0, briValue: d.briValue || 0, briCategory: d.briCategory || null,
-            sleepScore: d.sleepScore || 0, sleepCategory: d.sleepCategory,
-            stressScore: d.stressScore || 0, stressCategory: d.stressCategory,
-            familyHistory: d.familyHistory, medicalHistory: d.medicalHistory, finalCategory: d.finalCategory,
-          });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
+  const { screening, loading } = useScreening(id);
 
   if (loading) {
     return (
@@ -94,166 +128,246 @@ export default function ScreeningResults({ params }: { params: Promise<{ id: str
   }
 
   const cat = screening.finalCategory;
-
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric',
-    });
-  };
-
-  const formatTime = (iso: string) => {
-    return new Date(iso).toLocaleTimeString('en-IN', {
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
-
-  const params_list = [
-    { icon: 'BP', name: 'Blood Pressure', value: `${screening.bpSystolic} / ${screening.bpDiastolic} mmHg`, category: screening.bpCategory!, iconBg: '#fee2e2', iconColor: '#dc2626' },
-    { icon: 'BMI', name: 'BMI', value: `${screening.bmiValue} kg/m²`, category: screening.bmiCategory!, iconBg: '#dbeafe', iconColor: '#2563eb' },
-    { icon: 'ZZZ', name: 'Sleep Quality', value: `${screening.sleepScore} / 15`, category: screening.sleepCategory!, iconBg: '#e0e7ff', iconColor: '#6366f1' },
-    { icon: 'ST', name: 'Stress Level', value: `${screening.stressScore} / 16`, category: screening.stressCategory!, iconBg: '#ffedd5', iconColor: '#ea580c' },
-    { icon: 'FH', name: 'Family History', value: screening.familyHistory ? 'Yes' : 'No', category: (screening.familyHistory ? 'YELLOW' : 'GREEN') as Category, iconBg: '#fef9c3', iconColor: '#ca8a04' },
-    { icon: 'MH', name: 'Medical History', value: screening.medicalHistory ? 'Yes' : 'No', category: (screening.medicalHistory ? 'RED' : 'GREEN') as Category, iconBg: '#fee2e2', iconColor: '#dc2626' },
-  ];
-
+  const meta = catMeta[cat];
   const riskScore = cat === 'GREEN' ? 1 : cat === 'YELLOW' ? 3 : 5;
 
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  const bpSys = screening.bpSystolic ?? 0;
+  const bpDia = screening.bpDiastolic ?? 0;
+  const sleep = screening.sleepScore ?? 0;
+  const stress = screening.stressScore ?? 0;
+
+  const smokingValue =
+    screening.smokingCurrent ? 'Current smoker'
+    : screening.smokingPast ? 'Former smoker'
+    : 'Never smoked';
+
+  const factorCards = [
+    {
+      icon: <IconHeartPulse />,
+      bg: '#FEE2E2',
+      fg: '#EF4444',
+      name: 'Blood Pressure',
+      value: `${bpSys} / ${bpDia}`,
+      unit: 'mmHg',
+      cat: screening.bpCategory!,
+    },
+    {
+      icon: <IconScale />,
+      bg: '#EDE9FE',
+      fg: '#7C3AED',
+      name: 'Body Roundness',
+      value: `${screening.briValue ?? '—'}`,
+      unit: 'BRI',
+      cat: (screening.briCategory ?? 'GREEN') as Category,
+    },
+    {
+      icon: <IconMoon />,
+      bg: '#E0E7FF',
+      fg: '#4F46E5',
+      name: 'Sleep Quality',
+      value: `${sleep}`,
+      unit: '/ 15',
+      cat: screening.sleepCategory!,
+    },
+    {
+      icon: <IconBrain />,
+      bg: '#FEF3C7',
+      fg: '#D97706',
+      name: 'Stress Level',
+      value: `${stress}`,
+      unit: '/ 16',
+      cat: screening.stressCategory!,
+    },
+    {
+      icon: <IconUsers />,
+      bg: '#DCFCE7',
+      fg: '#16A34A',
+      name: 'Family History',
+      value: screening.familyHistory ? 'Present' : 'None',
+      unit: '',
+      cat: (screening.familyHistory ? 'YELLOW' : 'GREEN') as Category,
+    },
+    {
+      icon: <IconMedical />,
+      bg: '#CCFBF1',
+      fg: '#0D9488',
+      name: 'Medical History',
+      value: screening.medicalHistory ? 'Present' : 'None',
+      unit: '',
+      cat: (screening.medicalHistory ? 'RED' : 'GREEN') as Category,
+    },
+    {
+      icon: <IconSmoke />,
+      bg: '#FCE7F3',
+      fg: '#DB2777',
+      name: 'Smoking',
+      value: smokingValue,
+      unit: '',
+      cat: (screening.smokingCategory ?? 'GREEN') as Category,
+    },
+  ];
+
   const recommendations: string[] = [];
-  if (screening.bpCategory === 'RED' || screening.bpCategory === 'YELLOW') recommendations.push('Monitor blood pressure regularly');
-  if (screening.bmiCategory === 'RED' || screening.bmiCategory === 'YELLOW') recommendations.push('Maintain a balanced diet rich in fruits & vegetables');
-  if (screening.sleepCategory === 'RED' || screening.sleepCategory === 'YELLOW') recommendations.push('Aim for 7-9 hours of quality sleep each night');
-  if (screening.stressCategory === 'RED' || screening.stressCategory === 'YELLOW') recommendations.push('Practice stress-management techniques daily');
+  if (screening.bpCategory === 'RED' || screening.bpCategory === 'YELLOW') recommendations.push('Monitor blood pressure & watch salt intake');
+  if (screening.briCategory === 'RED' || screening.briCategory === 'YELLOW') recommendations.push('Eat balanced, move daily');
+  if (screening.sleepCategory === 'RED' || screening.sleepCategory === 'YELLOW') recommendations.push('Aim for 7–9 hours of consistent sleep');
+  if (screening.stressCategory === 'RED' || screening.stressCategory === 'YELLOW') recommendations.push('Practise daily stress-management');
   if (recommendations.length === 0) {
     recommendations.push('Continue maintaining your healthy lifestyle');
-    recommendations.push('Regular health check-ups are recommended');
+    recommendations.push('Keep regular annual health check-ups');
   }
 
   return (
     <div className="form-wrapper">
-      <div className="form-container" style={{ maxWidth: 800, padding: 0, overflow: 'hidden' }}>
-        <div className="report-header">
-          <div>
-            <div className="report-header-brand">DrMudhiwalla</div>
-            <div className="report-header-sub">HealthCare</div>
-          </div>
-          <div className="report-header-date">
-            <div>Test Date: {formatDate(screening.createdAt)}</div>
-            <div>Test Time: {formatTime(screening.createdAt)}</div>
-          </div>
-        </div>
-
-        <div className="report-body">
-          <div style={{ marginBottom: 16 }}>
-            <div className="report-greeting">
-              Hello, {screening.name.split(' ')[0]} <span style={{ fontWeight: 400, fontSize: 16 }}>👋</span>
+      <div
+        className="form-container"
+        style={{
+          maxWidth: 880,
+          padding: 0,
+          overflow: 'visible',
+          background: 'transparent',
+          backdropFilter: 'none',
+          border: 'none',
+          boxShadow: 'none',
+        }}
+      >
+        <div className="sr-page">
+          <div className="sr-head">
+            <div>
+              <div className="sr-brand-name">
+                  DrMudhiwalla <span className="sr-brand-ital">HealthTech</span>
+                </div>
+                <div className="sr-brand-tag">Pvt Ltd · Diagnostic &amp; Lifestyle Screening</div>
             </div>
-            <div className="report-greeting-sub">Here&apos;s your health screening summary</div>
-          </div>
-
-          <div className="report-info-row">
-            {[
-              { label: 'Name', value: screening.name },
-              { label: 'Age', value: `${screening.age} yrs` },
-              { label: 'WhatsApp', value: screening.whatsappNumber },
-            ].map((item, i) => (
-              <div key={i} className="report-info-pill">
-                <div className="report-info-pill-label">{item.label}</div>
-                <div className="report-info-pill-value">{item.value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <div className="report-physical-row">
-                <div style={{ textAlign: 'center' }}>
-                  <div className="report-physical-icon" style={{ background: '#ffedd5' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4" />
-                    </svg>
-                  </div>
-                  <div className="report-physical-val">{screening.heightCm || '—'}cm</div>
-                  <div className="report-physical-label">Height</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="report-physical-icon" style={{ background: '#dbeafe' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="5" r="3" /><path d="M6.5 8a2 2 0 0 0-1.9 1.3L2 17a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2l-2.6-7.7A2 2 0 0 0 17.5 8z" />
-                    </svg>
-                  </div>
-                  <div className="report-physical-val">{screening.weightKg || '—'}kg</div>
-                  <div className="report-physical-label">Weight</div>
-                </div>
+            <div className="sr-head-right">
+              <div className="sr-head-title">Screening Report</div>
+              <div className="sr-head-under">Wellness &amp; Risk Profile</div>
+              <div className="sr-head-date">
+                {formatDate(screening.createdAt)} · {formatTime(screening.createdAt)} · Ref: {screening.screeningId}
               </div>
             </div>
-
-            <div className="report-gauge">
-              <div className="report-gauge-title">Potential Risk</div>
-              <div style={{ position: 'relative', width: 110, height: 60, margin: '0 auto' }}>
-                <svg width="110" height="60" viewBox="0 0 120 65">
-                  <path d="M 10 60 A 50 50 0 0 1 35 12" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" />
-                  <path d="M 35 12 A 50 50 0 0 1 85 12" fill="none" stroke="#eab308" strokeWidth="8" strokeLinecap="round" />
-                  <path d="M 85 12 A 50 50 0 0 1 110 60" fill="none" stroke="#ef4444" strokeWidth="8" strokeLinecap="round" />
-                  {(() => {
-                    const angle = Math.PI - (riskScore / 5) * Math.PI;
-                    const nx = 60 + 40 * Math.cos(angle);
-                    const ny = 60 + 40 * Math.sin(angle);
-                    return <line x1="60" y1="60" x2={nx} y2={ny} stroke="#0f172a" strokeWidth="2" />;
-                  })()}
-                  <circle cx="60" cy="60" r="4" fill="#0f172a" />
-                </svg>
-              </div>
-              <div className="report-gauge-score">{riskScore} / 5</div>
-            </div>
           </div>
+          <div className="sr-accent" />
 
-          <div className="report-section-header">Lifestyle Risk Profile & Summary</div>
-
-          <div className="report-param-grid">
-            {params_list.map((p, i) => (
-              <div key={i} className="report-param-card">
-                <div className="report-param-icon" style={{ background: p.iconBg, color: p.iconColor }}>
-                  {p.icon}
+          <div className="sr-body">
+            {/* Patient hero */}
+            <div className="sr-hero">
+              <div className="sr-hero-id">
+                <div className="sr-hero-kicker">Health Screening Report</div>
+                <div className="sr-hero-name">{screening.name}</div>
+                <div className="sr-hero-sub">
+                  {screening.age} yrs · {screening.gender.charAt(0).toUpperCase() + screening.gender.slice(1)}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="report-param-label">{p.name}</div>
-                  <div className="report-param-value">{p.value}</div>
-                  <span className="report-param-badge" style={{ background: categoryBg[p.category], color: categoryText[p.category] }}>
-                    {categoryLabel[p.category]}
+              </div>
+              <div className="sr-vitals">
+                <div className="sr-vital">
+                  <span className="sr-vital-ic" style={{ background: '#DBEAFE', color: '#2563EB' }}>
+                    <IconRuler />
                   </span>
+                  <span className="sr-vital-val">
+                    {screening.heightCm || '—'} <i>cm</i>
+                  </span>
+                  <span className="sr-vital-label">Height</span>
+                </div>
+                <div className="sr-vital">
+                  <span className="sr-vital-ic" style={{ background: '#FEF3C7', color: '#D97706' }}>
+                    <IconDumbbell />
+                  </span>
+                  <span className="sr-vital-val">
+                    {screening.weightKg || '—'} <i>kg</i>
+                  </span>
+                  <span className="sr-vital-label">Weight</span>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className="report-reco-card">
-            <div className="report-reco-title">Key Recommendations</div>
-            <div className="report-reco-grid">
-              {recommendations.map((rec, i) => (
-                <div key={i} className="report-reco-item">
-                  <div className="report-reco-check">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+            {/* Overall lifestyle risk profile */}
+            <div className="sr-overall">
+              <div className="sr-gauge">
+                <RiskGauge score={riskScore} />
+                <div className="sr-gauge-score">
+                  {riskScore} <span>/ 5</span>
+                </div>
+                <div className="sr-gauge-cap">Overall Score</div>
+              </div>
+              <div className="sr-overall-info">
+                <div className="sr-overall-kicker">Overall Lifestyle Risk</div>
+                <div className={`sr-overall-title ${cat}`}>{meta.title}</div>
+                <p className="sr-overall-desc">{meta.desc}</p>
+                <div className="sr-risk-bar">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className={`sr-risk-seg ${i <= riskScore ? 'filled' : ''}`} style={{ '--seg': segColor[cat] } as CSSProperties} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Screened factors */}
+            <div className="sr-sec">
+              <div className="sr-sec-title">Screened Factors</div>
+              <div className="sr-sec-sub">Six parameters</div>
+            </div>
+
+            <div className="sr-cards">
+              {factorCards.map((f, i) => (
+                <div key={i} className="sr-card">
+                  <span className="sr-card-ic" style={{ background: f.bg, color: f.fg }}>{f.icon}</span>
+                  <div className="sr-card-info">
+                    <div className="sr-card-top">
+                      <div className="sr-card-name">{f.name}</div>
+                      <span className={`sr-badge ${f.cat}`}>{categoryLabel[f.cat]}</span>
+                    </div>
+                    <div className="sr-card-val">
+                      {f.value} {f.unit && <span>{f.unit}</span>}
+                    </div>
                   </div>
-                  <span className="report-reco-text">{rec}</span>
                 </div>
               ))}
             </div>
+
+            {/* Key recommendations */}
+            <div className="sr-sec">
+              <div className="sr-sec-title">Key Recommendations</div>
+              <div className="sr-sec-sub">Quick plan</div>
+            </div>
+
+            <div className="sr-reco">
+              <div className="sr-reco-title">Key Recommendations</div>
+              <div className="sr-reco-grid">
+                {recommendations.map((rec, i) => (
+                  <div key={i} className="sr-reco-item">
+                    <div className="sr-reco-ic">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <div className="sr-reco-text">{rec}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', margin: '22px 0 6px' }}>
+              <PDFReport state={screening} />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-            <PDFReport state={screening} />
+          <div className="sr-foot">
+            <div className="sr-disc">
+              <strong>Disclaimer:</strong> This screening is for health awareness only and does not replace a medical
+              diagnosis or consultation. Please consult a healthcare professional for a detailed evaluation.
+            </div>
+            <div className="sr-company">
+              <b>DrMudhiwalla HealthTech Pvt Ltd</b><br />
+              Diagnostic &amp; Lifestyle Screening Centre<br />
+              www.drmudhiwalla.com · +91 98765 43210
+            </div>
           </div>
-
-          <div className="disclaimer" style={{ marginBottom: 0 }}>
-            <strong>Important:</strong> This screening is for health awareness only and does not replace medical diagnosis or consultation. Please consult a healthcare professional for detailed evaluation.
-          </div>
-        </div>
-
-        <div className="report-footer">
-          <span>DrMudhiwalla HealthTech Pvt Ltd | CIN: U86201DL2025PTC451980 | GST: 07AALCD8789M1ZL</span>
-          <span>www.drmudhiwalla.com | +91 98765 43210</span>
         </div>
       </div>
       <Footer />
