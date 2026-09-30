@@ -44,6 +44,7 @@ export default function StaffDashboard() {
   const [waist, setWaist] = useState('');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -229,6 +230,36 @@ export default function StaffDashboard() {
       alert('Error saving measurements');
     }
     setSaving(false);
+  };
+
+  const handleResendLink = async (s: ScreeningRecord) => {
+    setResending(s.screeningId);
+    try {
+      const part2Link = `${window.location.origin}/screening/${s.screeningId}`;
+      const fallbackMessage = `Hi ${s.name}! Your gym health screening (ID: ${s.screeningId}) is ready for Part 2. Please complete the remaining assessments here: ${part2Link}`;
+
+      const res = await fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: s.whatsappNumber,
+          templateName: 'gymmvp',
+          variables: [s.name, s.screeningId, part2Link],
+          fallbackMessage,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.method === 'link') {
+        await navigator.clipboard.writeText(data.link);
+        alert('WhatsApp link copied to clipboard! Paste it in a chat to send.');
+      } else {
+        alert(`Part 2 link resent to ${s.whatsappNumber}`);
+      }
+    } catch {
+      alert('Failed to resend link');
+    }
+    setResending(null);
   };
 
   const handleSendResults = async (s: ScreeningRecord) => {
@@ -417,7 +448,16 @@ export default function StaffDashboard() {
                         <button onClick={() => openMeasure(s)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600, background: '#35AEF4', color: '#fff', border: 'none', cursor: 'pointer' }}>Measure</button>
                       )}
                       {s.status === 'LINK_SENT' && !s.finalCategory && (
-                        <span style={{ fontSize: 9, color: '#ca8a04' }}>Waiting...</span>
+                        <>
+                          <span style={{ fontSize: 9, color: '#ca8a04' }}>Waiting...</span>
+                          <button
+                            onClick={() => handleResendLink(s)}
+                            disabled={resending === s.screeningId}
+                            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600, background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer', opacity: resending === s.screeningId ? 0.6 : 1 }}
+                          >
+                            {resending === s.screeningId ? '...' : 'Resend'}
+                          </button>
+                        </>
                       )}
                       {s.status === 'COMPLETED' && s.finalCategory && (
                         <>

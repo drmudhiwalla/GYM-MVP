@@ -81,17 +81,6 @@ export default function HomePage() {
         throw new Error(data.error || `Registration failed (${res.status})`);
       }
 
-      fetch('/api/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: whatsapp.trim(),
-          templateName: 'gymmvp',
-          variables: [name.trim(), screeningId, window.location.origin],
-          fallbackMessage: `Hi ${name.trim()}! You are registered for the gym health screening. Your Screening ID: ${screeningId}. Please save it.`,
-        }),
-      }).catch((err) => console.error('WhatsApp send failed:', err));
-
       router.push(`/registered?id=${screeningId}`);
     } catch (err) {
       console.error('Registration failed:', err);
